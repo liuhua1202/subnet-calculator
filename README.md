@@ -31,7 +31,7 @@
 | Android | `SubnetCalculator-1.0.0.apk` | ~5 MB |
 
 > Windows：双击即用，无需安装。  
-> Android：开启"未知来源安装"后从手机安装，或使用 adb：`adb install app-release.apk`。
+> Android：开启"未知来源安装"后从手机安装，或使用 adb：`adb install SubnetCalculator-1.0.0.apk`。
 
 ## 🚀 本地开发
 
@@ -71,7 +71,7 @@ npx cap sync android
 # 2. 构建 debug APK（需 Android Studio 或命令行 SDK + JDK 17）
 cd android
 ./gradlew assembleDebug
-# 产物：android/app/build/outputs/apk/debug/app-debug.apk
+# 产物：android/app/build/outputs/apk/debug/SubnetCalculator-1.0.0.apk
 ```
 
 或在 Android Studio 中打开：

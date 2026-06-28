@@ -75,9 +75,13 @@ jobs:
       - name: Build debug APK
         run: cd android && ./gradlew assembleDebug --no-daemon
 
-      - name: List APK output
+      - name: Rename APK to product name
         shell: bash
-        run: ls -lh android/app/build/outputs/apk/debug/
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          mv android/app/build/outputs/apk/debug/app-debug.apk \
+             "android/app/build/outputs/apk/debug/SubnetCalculator-${VERSION}.apk"
+          ls -lh android/app/build/outputs/apk/debug/
 
       - name: Upload Android artifact
         uses: actions/upload-artifact@v4
