@@ -1,4 +1,4 @@
-name: Build Windows Portable
+name: Build Windows + Android
 
 on:
   push:
@@ -12,10 +12,9 @@ permissions:
   contents: write   # 用于创建 Release
 
 jobs:
-  build:
-    name: Build .exe (Windows x64)
+  build-windows:
+    name: Build Windows .exe
     runs-on: windows-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,9 +22,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: subnet-calculator/package-lock.json
+          node-version: '22'
 
       - name: Install dependencies
         run: npm ci
@@ -37,21 +34,80 @@ jobs:
         shell: bash
         run: ls -lh dist/
 
-      - name: Upload artifact (push)
-        if: github.event_name != 'pull_request'
+      - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
-          name: SubnetCalculator-portable
+          name: windows-portable
           path: dist/*.exe
           if-no-files-found: error
           retention-days: 14
 
-      - name: Create Release (tag only)
-        if: startsWith(github.ref, 'refs/tags/v')
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup Java JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Sync web assets to Android
+        run: npx cap sync android
+
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
+
+      - name: Build debug APK
+        run: cd android && ./gradlew assembleDebug --no-daemon
+
+      - name: List APK output
+        shell: bash
+        run: ls -lh android/app/build/outputs/apk/debug/
+
+      - name: Upload Android artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Create GitHub Release
+    needs: [build-windows, build-android]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List downloaded artifacts
+        shell: bash
+        run: find artifacts -type f -exec ls -lh {} \;
+
+      - name: Create Release with artifacts
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/*.exe
+            artifacts/**/*.exe
+            artifacts/**/*.apk
           generate_release_notes: true
           draft: false
           prerelease: false
