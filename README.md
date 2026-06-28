@@ -15,23 +15,26 @@
 - 🧮 **完整子网计算**：网络地址、广播地址、可分配 IP 范围、子网掩码、通配符掩码、总/可用主机数
 - 📋 **下拉式 CIDR 选择**：33 个选项（`/0` ~ `/32`），倒序排列，旁注点分十进制掩码，所见即所得
 - 🔍 **IP 类型自动识别**：A/B/C 类、RFC1918 私有、回环、链路本地、组播、保留地址、文档示例段等
-- 💾 **二进制表示**：4 段 8 位并排展示，网络位（蓝色）/主机位（黑色）一眼区分
+- 💾 **二进制表示**：4 段 8 位并排展示，网络位（蓝色 `#0078d4`）/主机位（浅灰 `#ddd`）一眼区分
 - ⚡ **即时计算**：IP 输入 400ms 防抖、掩码变更立即重算
+- ♿ **可访问性**：`<label>` 关联、`aria-live` 公告结果、`prefers-reduced-motion` 支持
 - 📱 **响应式 UI**：自动适配桌面 / 平板 / 手机屏幕，触摸友好
 - 🪟 **Windows 单文件便携**：71 MB 独立 `.exe`，零安装，双击即用
 - 🤖 **Android 原生应用**：通过 Capacitor 打包为 APK，离线运行
 
 ## 📦 下载
 
-前往 [Releases 页面](https://github.com/liuhua1202/subnet-calculator/releases) 下载最新版：
+前往 [Releases 页面](https://github.com/liuhua1202/subnet-calculator/releases) 下载最新版（产物文件名带版本号）：
 
 | 平台 | 文件 | 大小 |
 |---|---|---|
-| Windows | `SubnetCalculator-1.0.0-portable.exe` | ~71 MB |
-| Android | `SubnetCalculator-1.0.0.apk` | ~5 MB |
+| Windows | `SubnetCalculator-<版本>-portable.exe` | ~70 MB |
+| Android | `SubnetCalculator-<版本>.apk` | ~3 MB |
+| 校验 | `SHA256SUMS` | — |
 
 > Windows：双击即用，无需安装。  
-> Android：开启"未知来源安装"后从手机安装，或使用 adb：`adb install SubnetCalculator-1.0.0.apk`。
+> Android：开启"未知来源安装"后从手机安装，或使用 adb：`adb install SubnetCalculator-<版本>.apk`。  
+> 校验：`sha256sum -c SHA256SUMS`。
 
 ## 🚀 本地开发
 
@@ -59,7 +62,7 @@ npm start
 
 ```bash
 npm run build
-# 产物：dist/SubnetCalculator-1.0.0-portable.exe
+# 产物：dist/SubnetCalculator-<version>-portable.exe
 ```
 
 ### 构建 Android APK
@@ -71,7 +74,7 @@ npx cap sync android
 # 2. 构建 debug APK（需 Android Studio 或命令行 SDK + JDK 17）
 cd android
 ./gradlew assembleDebug
-# 产物：android/app/build/outputs/apk/debug/SubnetCalculator-1.0.0.apk
+# 产物：android/app/build/outputs/apk/debug/SubnetCalculator-<version>.apk
 ```
 
 或在 Android Studio 中打开：
@@ -130,14 +133,19 @@ subnet-calculator/
 
 ## 🧪 CI/CD
 
-[`.github/workflows/build.yml`](.github/workflows/build.yml) 在以下事件自动构建：
+[`.github/workflows/build.yml`](.github/workflows/build.yml) 三个 job 并行/串行：
 
-| 事件 | 行为 |
-|---|---|
-| push 到 `main` | 构建 Windows .exe 并上传为 artifact |
-| 推送 tag（`v*`） | 构建 + 自动创建 GitHub Release 并附 .exe |
-| Pull Request | 构建验证但不发布 |
-| 手动触发 | Actions 页 Run workflow |
+| Job | Runner | 触发 | 产物 |
+|---|---|---|---|
+| `build-windows` | windows-latest | 所有 push / PR / tag | `SubnetCalculator-<ver>-portable.exe` |
+| `build-android` | ubuntu-latest | 所有 push / PR / tag | `SubnetCalculator-<ver>.apk` |
+| `release` | ubuntu-latest | 仅 tag `v*` | GitHub Release + `SHA256SUMS` |
+
+- **concurrency**：新 push 会取消旧 run（PR 立即取消，main 保留到新 push 完成后）
+- **缓存**：npm cache + Gradle cache（windows ~30s、Android ~1min 加速）
+- **PR**：构建验证但不上传 artifact（节省 CI 分钟）
+- **超时**：windows 30min / Android 45min / release 10min
+- **权限**：每个 job 独立最小权限
 
 发新版：
 
@@ -158,6 +166,16 @@ git push origin v1.1.0
 | `172.16.50.99 /20` | `172.16.48.0` | `172.16.63.255` | `.48.1 ~ .63.254` | 4,094 |
 | `10.5.5.5 /30` | `10.5.5.4` | `10.5.5.7` | `.5 ~ .6` | 2 |
 | `8.8.8.8 /8` | `8.0.0.0` | `15.255.255.255` | `8.0.0.1 ~ 15.255.255.254` | 16,777,214 |
+
+## 📋 v1.0.2 变更摘要
+
+相比 v1.0.0/v1.0.1，主要重构：
+
+- **删除**：子网划分表（原用有类边界推算，结果在不同 IP 类下不一致）
+- **修复**：`maskToOctets` 不再拒绝 `0.0.0.0`；`getIpType` broadcast 分支不再被 `>=240` 截胡
+- **可访问性**：`<label>` 关联、`aria-live`、`:focus-visible`、`prefers-reduced-motion`
+- **CI**：concurrency 取消、npm/Gradle cache、SHA256SUMS、每个 job 最小权限与超时
+- **依赖**：`@capacitor/android` 移到 devDependencies
 
 ## 🐛 故障排查
 
