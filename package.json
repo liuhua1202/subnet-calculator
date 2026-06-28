@@ -1,6 +1,6 @@
 {
   "name": "subnet-calculator",
-  "version": "1.0.0",
+  "version": "1.0.3",
   "description": "子网计算器 - Metro 风格的 Windows / Android 桌面与移动应用",
   "main": "main.js",
   "author": "Subnet Calculator",
