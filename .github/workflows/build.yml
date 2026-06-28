@@ -1,0 +1,57 @@
+name: Build Windows Portable
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write   # 用于创建 Release
+
+jobs:
+  build:
+    name: Build .exe (Windows x64)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: subnet-calculator/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build portable .exe
+        run: npm run build
+
+      - name: List build output
+        shell: bash
+        run: ls -lh dist/
+
+      - name: Upload artifact (push)
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: SubnetCalculator-portable
+          path: dist/*.exe
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Create Release (tag only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.exe
+          generate_release_notes: true
+          draft: false
+          prerelease: false
