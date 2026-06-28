@@ -95,13 +95,20 @@ jobs:
         run: chmod +x android/gradlew
 
       - name: Build debug APK
-        run: cd android && ./gradlew assembleDebug --no-daemon
+        run: |
+          cd android
+          VERSION=$(node -p "require('./package.json').version")
+          # versionCode: 1.0.3 -> 10003, 1.2.3 -> 10203, etc.
+          VERSION_CODE=$(echo "$VERSION" | awk -F. '{ printf "%d%02d%02d", $1, $2, $3 }')
+          ./gradlew assembleDebug --no-daemon \
+            -PversionName="$VERSION" \
+            -PversionCode="$VERSION_CODE"
 
       - name: Rename APK to product name
         shell: bash
         run: |
           VERSION=$(node -p "require('./package.json').version")
-          mv android/app/build/outputs/apk/debug/app-debug.apk \
+          mv "android/app/build/outputs/apk/debug/app-debug.apk" \
              "android/app/build/outputs/apk/debug/SubnetCalculator-${VERSION}.apk"
           ls -lh android/app/build/outputs/apk/debug/
 
