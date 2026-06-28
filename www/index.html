@@ -502,6 +502,59 @@
                 gap: 4px;
             }
         }
+
+        /* 超小屏 (iPhone SE 等 375px 宽度) */
+        @media (max-width: 380px) {
+            .app-header {
+                padding: 14px 16px;
+            }
+            .app-header h1 {
+                font-size: 16px;
+            }
+            .app-header .subtitle {
+                display: none;
+            }
+            .app-body {
+                padding: 10px;
+                gap: 10px;
+            }
+            .input-section {
+                padding: 14px;
+            }
+            .results-grid {
+                grid-template-columns: 1fr;
+            }
+            .tile {
+                padding: 10px 12px;
+                min-height: 52px;
+            }
+            .tile .tile-label {
+                font-size: 10px;
+            }
+            .tile .tile-value {
+                font-size: 13px;
+            }
+            .binary-section {
+                padding: 14px;
+            }
+            .binary-row .bin-octet {
+                padding: 3px 6px;
+                font-size: 11px;
+                letter-spacing: 0;
+            }
+        }
+
+        /* 触摸设备优化：增大点击区域 */
+        @media (hover: none) and (pointer: coarse) {
+            .input-group input,
+            .input-group select {
+                height: 44px;
+                font-size: 16px;  /* 防止 iOS 自动放大 */
+            }
+            .btn-calculate {
+                min-height: 48px;
+            }
+        }
     </style>
 </head>
 <body>

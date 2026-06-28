@@ -24,6 +24,25 @@ yarn-error.log*
 # electron-builder cached binaries (re-downloaded on npm install)
 build/winCodeSign/
 
+# Android / Capacitor build output
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+android/.idea/
+android/*.iml
+android/app/*.iml
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+android/app/src/main/assets/capacitor.plugins.json
+android/captures/
+android/.cxx/
+*.apk
+*.aab
+*.aar
+*.ap_
+*.dex
+
 # Editor
 .vscode/
 .idea/

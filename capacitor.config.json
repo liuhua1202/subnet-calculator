@@ -1,0 +1,12 @@
+{
+  "appId": "com.subnet.calculator",
+  "appName": "子网计算器",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#e8e8e8"
+  }
+}
