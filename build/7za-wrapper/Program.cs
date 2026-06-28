@@ -1,47 +1,35 @@
-// 7za wrapper with debug logging
+// 7za wrapper: injects -snl- to skip symlinks on Windows.
+// Triggered by electron-builder postinstall via build/7za-wrapper/build.js
 using System;
 using System.Diagnostics;
-using System.IO;
-using System.Text;
 
 class Wrapper
 {
-    static string QuoteArg(string a)
-    {
-        if (a.IndexOfAny(new[] { ' ', '\t', '"' }) < 0) return a;
-        return "\"" + a.Replace("\"", "\\\"") + "\"";
-    }
-
     static int Main(string[] args)
     {
         string exeDir = AppDomain.CurrentDomain.BaseDirectory;
-        string real = Path.Combine(exeDir, "7za-real.exe");
-        if (!File.Exists(real))
+        string real = System.IO.Path.Combine(exeDir, "7za-real.exe");
+        if (!System.IO.File.Exists(real))
         {
             Console.Error.WriteLine("7za-real.exe not found next to wrapper at: " + exeDir);
             return 1;
         }
 
-        var sb = new StringBuilder();
-        foreach (var a in args) { sb.Append(QuoteArg(a)); sb.Append(' '); }
-        sb.Append("-snl-");
-
-        var fullCmd = real + " " + sb.ToString();
-        Console.Error.WriteLine("[7za-wrapper] Executing: " + fullCmd);
-
-        var psi = new ProcessStartInfo
+        var psi = new ProcessStartInfo(real)
         {
-            FileName = real,
-            Arguments = sb.ToString(),
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
+            StandardOutputEncoding = System.Text.Encoding.UTF8,
         };
+        // ArgumentList 正确处理空格/引号，无需手动 QuoteArg
+        foreach (var a in args) psi.ArgumentList.Add(a);
+        psi.ArgumentList.Add("-snl-");
 
         try
         {
-            var p = Process.Start(psi);
+            using var p = Process.Start(psi);
             p.OutputDataReceived += (s, e) => { if (e.Data != null) Console.Out.WriteLine(e.Data); };
             p.ErrorDataReceived += (s, e) => { if (e.Data != null) Console.Error.WriteLine(e.Data); };
             p.BeginOutputReadLine();
