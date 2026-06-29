@@ -148,6 +148,7 @@ jobs:
             artifacts/**/*.exe
             artifacts/**/*.apk
             artifacts/SHA256SUMS
-          generate_release_notes: true
+          body_path: docs/releases/v1.0.4.zh-CN.md
+          generate_release_notes: false
           draft: false
           prerelease: false
