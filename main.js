@@ -9,7 +9,7 @@ function createWindow() {
     mainWindow = new BrowserWindow({
         width: 900,
         height: 800,
-        minWidth: 480,           // >= 820 容器宽度，避免出现横向滚动
+        minWidth: 480,           // 移动布局在 <=640px 触发，480 留作"勉强可读"下限；容器 max-width: 820 会随窗口收缩
         minHeight: 600,
         title: '子网计算器 - Subnet Calculator',
         backgroundColor: '#e8e8e8',

@@ -97,8 +97,8 @@ jobs:
       - name: Build debug APK
         run: |
           VERSION=$(node -p "require('./package.json').version")
-          # versionCode: 1.0.3 -> 10003, 1.2.3 -> 10203, etc.
-          VERSION_CODE=$(echo "$VERSION" | awk -F. '{ printf "%d%02d%02d", $1, $2, $3 }')
+          # versionCode: 1.0.3 -> 100003, 1.0.10 -> 100010, 1.1.0 -> 101000（避免 1.0.10/1.1.0 碰撞）
+          VERSION_CODE=$(echo "$VERSION" | awk -F. '{ printf "%d%03d%03d", $1, $2, $3 }')
           echo "versionName=$VERSION  versionCode=$VERSION_CODE"
           cd android
           ./gradlew assembleDebug --no-daemon \

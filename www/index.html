@@ -410,6 +410,14 @@
             background: #e2d9f3;
             color: #3d2170;
         }
+        .ip-type-badge.broadcast {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .ip-type-badge.reserved {
+            background: #e2e3e5;
+            color: #383d41;
+        }
 
         /* 子网划分表 */
         /* 子网划分表 CSS 已随 v1.0.2 一同移除 */
@@ -708,7 +716,8 @@
 
                 // 特殊地址优先（broadcast/unspecified 必须在 >=240 检查之前）
                 if (full === 0xFFFFFFFF) return { type: 'broadcast', label: '受限广播地址 (255.255.255.255)', cls: 'broadcast' };
-                if (full === 0) return { type: 'unspecified', label: '未指定地址 (0.0.0.0)', cls: 'broadcast' };
+                if (full === 0) return { type: 'unspecified', label: '未指定地址 (0.0.0.0)', cls: 'reserved' };
+                if (first === 0) return { type: 'reserved', label: '保留地址 (0.0.0.0/8)', cls: 'reserved' };
                 if (first === 127) return { type: 'loopback', label: '回环地址 (127.0.0.0/8)', cls: 'loopback' };
                 if (first === 10) return { type: 'private', label: '私有地址 A类 (10.0.0.0/8)', cls: 'private' };
                 if (first === 172 && second >= 16 && second <= 31) return { type: 'private', label: '私有地址 B类 (172.16.0.0/12)', cls: 'private' };
@@ -842,8 +851,9 @@
                 // 高亮网络部分（被掩码覆盖的位）
                 const highlightCount = cidr;
                 function renderBinRow(label, binOctets) {
-                    let totalBits = 0;
                     const spans = binOctets.map((octet, idx) => {
+                        // 仅当整个 octet 全为网络位时才加 .highlight（蓝底）；部分网络位的 octet 靠 per-bit 颜色区分
+                        const isFullOctet = (idx + 1) * 8 <= highlightCount;
                         let html = '';
                         for (let b = 0; b < 8; b++) {
                             const bitPos = idx * 8 + b;
@@ -852,8 +862,7 @@
                                 `<span style="color:${isHighlight ? '#0078d4' : '#999'};font-weight:${isHighlight ? '700' : '400'};">${octet[b]}</span>`;
                             if (b === 3) html += ' ';
                         }
-                        totalBits += 8;
-                        return `<span class="bin-octet${idx < Math.ceil(highlightCount/8) ? ' highlight' : ''}">${html}</span>`;
+                        return `<span class="bin-octet${isFullOctet ? ' highlight' : ''}">${html}</span>`;
                     }).join('<span style="color:#ccc;margin:0 2px;">·</span>');
                     return `
                         <div class="binary-row">
