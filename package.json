@@ -5,6 +5,10 @@
   "main": "main.js",
   "author": "Subnet Calculator",
   "license": "MIT",
+  "engines": {
+    "node": ">=20",
+    "npm": ">=9"
+  },
   "scripts": {
     "start": "electron .",
     "build": "electron-builder --win portable",
@@ -12,14 +16,20 @@
     "build:all": "electron-builder --win portable nsis",
     "android:sync": "cap sync android",
     "android:open": "cap open android",
-    "android:build": "cd android && gradlew assembleDebug"
+    "android:build": "cd android && gradlew assembleDebug",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint www/app.js main.js build/7za-wrapper/build.js tests/",
+    "postinstall": "node build/7za-wrapper/build.js"
   },
   "devDependencies": {
     "@capacitor/android": "^6.2.1",
     "@capacitor/cli": "^6.2.1",
     "@capacitor/core": "^6.2.1",
     "electron": "^33.4.11",
-    "electron-builder": "^25.1.8"
+    "electron-builder": "^25.1.8",
+    "eslint": "^9.13.0",
+    "vitest": "^2.1.4"
   },
   "build": {
     "appId": "com.subnet.calculator",
@@ -36,7 +46,10 @@
       "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
       "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
       "!**/node_modules/*.d.ts",
-      "!**/node_modules/.bin"
+      "!**/node_modules/.bin",
+      "!**/tests/**",
+      "!**/.eslintrc*",
+      "!**/eslint.config.*"
     ],
     "win": {
       "target": [
