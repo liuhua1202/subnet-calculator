@@ -141,6 +141,25 @@ jobs:
           find . -type f \( -name '*.exe' -o -name '*.apk' \) -exec sha256sum {} \; > SHA256SUMS
           cat SHA256SUMS
 
+      - name: Resolve release notes body
+        id: read-body
+        shell: bash
+        run: |
+          # 从 tag 推断 release notes 路径，例如 v1.0.4 -> docs/releases/v1.0.4.zh-CN.md
+          TAG="${GITHUB_REF_NAME}"
+          BODY_FILE="docs/releases/${TAG}.zh-CN.md"
+          if [ -f "$BODY_FILE" ]; then
+            {
+              echo "body_file<<EOF"
+              cat "$BODY_FILE"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+            echo "✅ Loaded release notes from $BODY_FILE ($(wc -c < "$BODY_FILE") bytes)"
+          else
+            echo "body_file=" >> "$GITHUB_OUTPUT"
+            echo "ℹ️  Release notes file not found: $BODY_FILE (will fall back to auto-generated notes)"
+          fi
+
       - name: Create Release with artifacts
         uses: softprops/action-gh-release@v2
         with:
@@ -148,7 +167,45 @@ jobs:
             artifacts/**/*.exe
             artifacts/**/*.apk
             artifacts/SHA256SUMS
-          body_path: docs/releases/v1.0.4.zh-CN.md
-          generate_release_notes: false
+          body_path: ${{ steps.read-body.outputs.body_file }}
+          generate_release_notes: ${{ steps.read-body.outputs.body_file == '' }}
           draft: false
           prerelease: false
+
+      - name: Verify and patch release body if missing
+        if: steps.read-body.outputs.body_file != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          BODY_FILE: ${{ steps.read-body.outputs.body_file }}
+          REPO: ${{ github.repository }}
+        run: |
+          # softprops/action-gh-release@v2 在某些情况下 body_path 不会生效（已知问题）
+          # 这里加一道保险：如果 release 创建后 body 仍然为空/缺失，从文件重读并 PATCH
+          echo "Verifying release body for tag $TAG..."
+          sleep 3
+          RELEASE_JSON=$(gh api "repos/${REPO}/releases/tags/${TAG}")
+          RELEASE_ID=$(echo "$RELEASE_JSON" | jq -r '.id // empty')
+          CURRENT_BODY=$(echo "$RELEASE_JSON" | jq -r '.body // empty')
+
+          if [ -z "$RELEASE_ID" ]; then
+            echo "❌ Could not find release for tag $TAG"
+            exit 1
+          fi
+
+          if [ -z "$CURRENT_BODY" ]; then
+            echo "⚠️  Release body is empty, patching from $BODY_FILE"
+            BODY_CONTENT=$(cat "$BODY_FILE")
+            # PATCH 需要 body 作为 JSON 字段，用 jq 构造安全的 JSON 字符串
+            PAYLOAD=$(jq -n --arg body "$BODY_CONTENT" '{body: $body}')
+            gh api \
+              --method PATCH \
+              -H "Accept: application/vnd.github+json" \
+              -H "Content-Type: application/json" \
+              "repos/${REPO}/releases/${RELEASE_ID}" \
+              --input - <<< "$PAYLOAD"
+            echo "✅ Release body patched successfully"
+          else
+            echo "✅ Release body already present (${#CURRENT_BODY} chars), no patch needed"
+          fi
