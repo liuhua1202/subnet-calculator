@@ -97,27 +97,33 @@ npx cap open android
 ## 🏗️ 技术栈
 
 - **[Electron 33](https://www.electronjs.org/)** — Windows 桌面运行时
-- **[Capacitor 6](https://capacitorjs.com/)** — Android 打包（也可加 iOS）
+- **[Capacitor 6](https://capacitorjs.com/)** — Android 打包
 - **[electron-builder 25](https://www.electron.build/)** — Windows 打包工具，输出 portable 单文件
-- **纯 HTML/CSS/JS** — 无前端框架，单文件 `www/index.html` 自包含
+- **纯 HTML/CSS/JS** — 无前端框架；`www/index.html` 负责 UI/样式，外加 `www/app.js`（交互）+ `www/subnet.js`（纯函数）
 - **GitHub Actions** — CI/CD，`windows-latest` runner 自动构建
 
 ### 7za symlink 绕过方案
 
-`electron-builder` 依赖 `winCodeSign` 做 Windows 代码签名，但解压时含 macOS `.dylib` 软链接，Windows 默认权限下 `7za` 失败（exit code 2）。本仓库通过 [`build/7za-wrapper/Program.cs`](build/7za-wrapper/Program.cs) 实现 C# shim：注入 `-snl-` 参数跳过符号链接，然后由 `electron-builder` 的 npm postinstall 把它编译成 `node_modules/7zip-bin/win/x64/7za.exe`，原 `7za.exe` 备份为 `7za-real.exe`。
+`electron-builder` 依赖 `winCodeSign` 做 Windows 代码签名，但解压时含 macOS `.dylib` 软链接，Windows 默认权限下 `7za` 失败（exit code 2）。本仓库通过 [`build/7za-wrapper/Program.cs`](build/7za-wrapper/Program.cs) 实现 C# shim：注入 `-snl-` 参数跳过符号链接。`package.json` 的 `postinstall` 钩子调用 [`build/7za-wrapper/build.js`](build/7za-wrapper/build.js) 在 Windows 上自动把 `Program.cs` 编译成 `node_modules/7zip-bin/win/x64/7za.exe`，原 `7za.exe` 备份为 `7za-real.exe`。
 
 ## 📂 项目结构
 
 ```
 subnet-calculator/
-├── main.js                    # Electron 主进程（单实例锁、菜单、About）
+├── main.js                    # Electron 主进程（单实例锁、菜单、About、错误处理）
 ├── www/
-│   └── index.html             # 全部 UI + CSS + JS（单文件自包含）
+│   ├── index.html             # 全部 UI + CSS（拆分自原单文件）
+│   ├── app.js                 # 前端交互（DOM + 事件）
+│   └── subnet.js              # 纯函数库（IP/掩码/CIDR 计算，可单测）
 ├── capacitor.config.json      # Capacitor 应用配置
-├── package.json               # 依赖与 electron-builder 配置
+├── package.json               # 依赖、postinstall、构建配置
 ├── build/
 │   └── 7za-wrapper/
+│       ├── build.js           # postinstall 钩子：编译 shim
 │       └── Program.cs         # 7za C# shim 源码
+├── tests/
+│   └── subnet.test.js         # Vitest 单测
+├── eslint.config.js           # ESLint 9 flat config
 ├── android/                   # Capacitor 生成的 Android 工程
 │   └── app/src/main/
 │       ├── AndroidManifest.xml
@@ -165,7 +171,7 @@ git push origin v1.1.0
 | `192.168.1.100 /24` | `192.168.1.0` | `192.168.1.255` | `.1 ~ .254` | 254 |
 | `172.16.50.99 /20` | `172.16.48.0` | `172.16.63.255` | `.48.1 ~ .63.254` | 4,094 |
 | `10.5.5.5 /30` | `10.5.5.4` | `10.5.5.7` | `.5 ~ .6` | 2 |
-| `8.8.8.8 /8` | `8.0.0.0` | `15.255.255.255` | `8.0.0.1 ~ 15.255.255.254` | 16,777,214 |
+| `8.8.8.8 /8` | `8.0.0.0` | `8.255.255.255` | `8.0.0.1 ~ 8.255.255.254` | 16,777,214 |
 
 ## 📋 v1.0.4 变更摘要
 
@@ -194,12 +200,13 @@ git push origin v1.1.0
 A: 检查是否有 Windows Defender SmartScreen 拦截。便携 .exe 未签名时常见，可右键 → 属性 → 勾选"解除锁定"。
 
 **Q: `npm install` 时 `7za` 解压失败？**
-A: 这是 Windows 上的已知问题。`build/7za-wrapper/` 下的 C# shim 应在 postinstall 阶段自动编译替换。如未生效，手动执行：
+A: 这是 Windows 上的已知问题。`package.json` 的 `postinstall` 会自动调用 `build/7za-wrapper/build.js` 把 C# shim 编译到 `node_modules/7zip-bin/win/x64/7za.exe`。如 postinstall 失败（例如没装 Visual Studio / Build Tools），可手动执行：
 ```bash
 "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\MSBuild\Current\Bin\Roslyn\csc.exe" \
-  -out:node_modules/7zip-bin/win/x64/7za.exe \
-  build/7za-wrapper/Program.cs
-# 然后把原 7za.exe 重命名为 7za-real.exe
+  -out:node_modules\7zip-bin\win\x64\7za.exe \
+  build\7za-wrapper\Program.cs
+# 把原 7za.exe 重命名为 7za-real.exe
+# 非 Windows 平台无此问题
 ```
 
 **Q: Android 构建报 `SDK location not found`？**
@@ -207,6 +214,14 @@ A: 在 `android/local.properties` 中设置 `sdk.dir=C\:\\Users\\你的用户名
 
 **Q: GitHub Actions 失败？**
 A: 在 Actions 页查看日志。`windows-latest` runner 自带 csc.exe 和 Android SDK，理论上可直接编译。若失败，把日志粘到 Issue。
+
+## 🧪 测试 & Lint
+
+```bash
+npm test        # Vitest 单测（覆盖所有纯函数）
+npm run lint    # ESLint
+npm run test:watch  # 开发时 watch 模式
+```
 
 ## 📄 许可证
 
