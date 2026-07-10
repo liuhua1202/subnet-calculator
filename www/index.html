@@ -67,8 +67,13 @@
             user-select: none;
         }
         .app-header .icon {
-            font-size: 28px;
-            line-height: 1;
+            width: 32px;
+            height: 32px;
+            flex-shrink: 0;
+            color: #fff;             /* SVG outline + display 用 */
+        }
+        .app-header .icon .display-text {
+            fill: var(--tile-blue); /* 显示屏里的 "1010" 用品牌色，在白底可见 */
         }
         .app-header h1 {
             font-size: 20px;
@@ -560,7 +565,26 @@
     <div class="app-container">
         <!-- 标题栏 -->
         <div class="app-header">
-            <span class="icon">🌐</span>
+            <svg class="icon" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <!-- 计算器外壳 -->
+                <rect x="24" y="12" width="80" height="104" rx="12" ry="12"
+                      fill="none" stroke="currentColor" stroke-width="6"/>
+                <!-- 显示屏（实心） -->
+                <rect x="36" y="24" width="56" height="24" rx="4" ry="4"
+                      fill="currentColor"/>
+                <!-- 显示屏里的二进制 "1010"（用品牌色，在白屏可见） -->
+                <text class="display-text" x="64" y="41" text-anchor="middle"
+                      font-family="'Courier New', monospace" font-size="13" font-weight="700">1010</text>
+                <!-- 2x3 按钮网格 -->
+                <rect x="36" y="58" width="14" height="14" rx="3" fill="currentColor"/>
+                <rect x="57" y="58" width="14" height="14" rx="3" fill="currentColor"/>
+                <rect x="78" y="58" width="14" height="14" rx="3" fill="currentColor"/>
+                <rect x="36" y="78" width="14" height="14" rx="3" fill="currentColor"/>
+                <rect x="57" y="78" width="14" height="14" rx="3" fill="currentColor"/>
+                <rect x="78" y="78" width="14" height="14" rx="3" fill="currentColor"/>
+                <!-- 等号键 -->
+                <rect x="36" y="98" width="56" height="10" rx="3" fill="currentColor"/>
+            </svg>
             <h1>子网计算器</h1>
             <span class="subtitle">Subnet Calculator</span>
         </div>
@@ -571,7 +595,7 @@
             <div class="input-section">
                 <div class="input-group">
                     <label for="ipInput">IP 地址</label>
-                    <input type="text" id="ipInput" placeholder="例如: 192.168.1.1" autocomplete="off" inputmode="decimal" aria-describedby="ipInput-hint">
+                    <input type="text" id="ipInput" placeholder="例如: 192.168.1.1" value="192.168.1.1" autocomplete="off" inputmode="decimal" aria-describedby="ipInput-hint">
                     <span id="ipInput-hint" class="sr-only">IPv4 点分十进制，0-255.0-255.0-255.0-255</span>
                 </div>
                 <div class="input-group">

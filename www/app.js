@@ -48,7 +48,6 @@
             { label: '子网掩码', value: r.mask + '  /' + r.cidr,
               accent: 'accent-purple', copy: true },
             { label: '通配符掩码', value: r.wildcard, accent: 'accent-teal', copy: true },
-            { label: '总主机数', value: r.totalHosts.toLocaleString(), accent: 'accent-orange', copy: false },
             { label: '可用主机数', value: r.usableHosts.toLocaleString(), accent: 'accent-cyan', copy: false },
             { label: 'CIDR前缀', value: '/' + r.cidr, accent: 'accent-blue', copy: false },
             { label: '网络类型', value: netType.label,
