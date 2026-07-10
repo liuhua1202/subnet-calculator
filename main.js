@@ -28,6 +28,12 @@ function createWindow() {
         mainWindow.show();
     });
 
+    // 加载失败兜底（默认行为是空白窗口 + 静默失败）
+    mainWindow.webContents.on('did-fail-load', (_e, errorCode, errorDescription, validatedURL) => {
+        const detail = `无法加载 ${validatedURL}\n\n错误码 ${errorCode}：${errorDescription}\n\n通常是 www/index.html 缺失或被杀毒软件拦截。`;
+        dialog.showErrorBox('子网计算器启动失败', detail);
+    });
+
     // 阻止导航到外部页面（防止 XSS 引发的跳转）
     mainWindow.webContents.on('will-navigate', (e, url) => {
         const fileUrl = `file:///${path.join(__dirname, 'www', 'index.html').replace(/\\/g, '/')}`;
