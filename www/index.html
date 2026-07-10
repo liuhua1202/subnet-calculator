@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'self' 'unsafe-inline'; base-uri 'none'; form-action 'none';">
+    <meta name="theme-color" content="#0078d4">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'self'; base-uri 'none'; form-action 'none';">
     <title>子网计算器 - Subnet Calculator</title>
     <style>
         :root {
@@ -246,6 +247,18 @@
         }
         .tile.accent-cyan {
             border-top-color: var(--tile-cyan);
+        }
+        /* 仅屏幕阅读器可见（a11y hint） */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
         }
         .tile .tile-label {
             font-size: 10px;
@@ -558,7 +571,8 @@
             <div class="input-section">
                 <div class="input-group">
                     <label for="ipInput">IP 地址</label>
-                    <input type="text" id="ipInput" placeholder="例如: 192.168.1.1" value="192.168.1.1" autocomplete="off" inputmode="decimal" aria-describedby="ipInput-hint">
+                    <input type="text" id="ipInput" placeholder="例如: 192.168.1.1" autocomplete="off" inputmode="decimal" aria-describedby="ipInput-hint">
+                    <span id="ipInput-hint" class="sr-only">IPv4 点分十进制，0-255.0-255.0-255.0-255</span>
                 </div>
                 <div class="input-group">
                     <label for="maskInput">子网掩码 / CIDR</label>
@@ -588,356 +602,8 @@
     <!-- Toast -->
     <div id="toast" class="copy-toast" style="display:none;"></div>
 
-    <script>
-        (function() {
-            // ============ DOM 元素 ============
-            const ipInput = document.getElementById('ipInput');
-            const maskInput = document.getElementById('maskInput');
-            const btnCalc = document.getElementById('btnCalc');
-            const resultsGrid = document.getElementById('resultsGrid');
-            const binaryContent = document.getElementById('binaryContent');
-            const ipTypeSection = document.getElementById('ipTypeSection');
-            const toast = document.getElementById('toast');
-
-            // 填充 CIDR 下拉菜单（0-32 共 33 项，每项同时显示点分十进制掩码）
-            (function populateMaskDropdown() {
-                const frag = document.createDocumentFragment();
-                // 倒序：/32 在最上面，/0 在最下面
-                for (let i = 32; i >= 0; i--) {
-                    const mask = cidrToOctets(i).join('.');
-                    const opt = document.createElement('option');
-                    opt.value = String(i);
-                    opt.textContent = '/' + i + '   ' + mask;
-                    frag.appendChild(opt);
-                }
-                maskInput.appendChild(frag);
-                maskInput.value = '24';
-            })();
-
-            // ============ 工具函数 ============
-            function showToast(msg) {
-                toast.textContent = msg;
-                toast.style.display = 'block';
-                toast.style.animation = 'none';
-                void toast.offsetWidth; // reflow
-                toast.style.animation = 'fadeInUp 0.3s ease, fadeOut 0.3s ease 1.5s forwards';
-                setTimeout(() => { toast.style.display = 'none'; }, 1800);
-            }
-
-            function ipToOctets(ipStr) {
-                const parts = ipStr.trim().split('.');
-                if (parts.length !== 4) return null;
-                const octets = [];
-                for (const p of parts) {
-                    const num = parseInt(p, 10);
-                    if (isNaN(num) || num < 0 || num > 255) return null;
-                    octets.push(num);
-                }
-                return octets;
-            }
-
-            function ipToUint32(octets) {
-                return ((octets[0] << 24) | (octets[1] << 16) | (octets[2] << 8) | octets[3]) >>> 0;
-            }
-
-            function uint32ToIp(num) {
-                return [
-                    (num >>> 24) & 0xFF,
-                    (num >>> 16) & 0xFF,
-                    (num >>> 8) & 0xFF,
-                    num & 0xFF,
-                ].join('.');
-            }
-
-            function maskToOctets(maskStr) {
-                // 先尝试CIDR
-                if (maskStr.trim().startsWith('/')) {
-                    const cidr = parseInt(maskStr.trim().slice(1), 10);
-                    if (isNaN(cidr) || cidr < 0 || cidr > 32) return null;
-                    return cidrToOctets(cidr);
-                }
-                // 尝试点分十进制
-                const octets = ipToOctets(maskStr);
-                if (octets) {
-                    // 验证是否是合法掩码（连续 1 后跟连续 0；0.0.0.0 也合法 = /0）
-                    const uint = ipToUint32(octets);
-                    const inverted = (~uint) >>> 0;
-                    if ((inverted & (inverted + 1)) === 0) {
-                        return octets;
-                    }
-                    // 不是合法掩码字符串，尝试当作 CIDR 数字
-                    const num = parseInt(maskStr.trim(), 10);
-                    if (!isNaN(num) && num >= 0 && num <= 32) {
-                        return cidrToOctets(num);
-                    }
-                    return null;
-                }
-                // 尝试纯数字 CIDR
-                const num = parseInt(maskStr.trim(), 10);
-                if (!isNaN(num) && num >= 0 && num <= 32) {
-                    return cidrToOctets(num);
-                }
-                return null;
-            }
-
-            function cidrToOctets(cidr) {
-                const mask = cidr === 0 ? 0 : ((0xFFFFFFFF << (32 - cidr)) >>> 0);
-                return [
-                    (mask >>> 24) & 0xFF,
-                    (mask >>> 16) & 0xFF,
-                    (mask >>> 8) & 0xFF,
-                    mask & 0xFF,
-                ];
-            }
-
-            function octetsToCidr(octets) {
-                const uint = ipToUint32(octets);
-                if (uint === 0) return 0;
-                let cidr = 0;
-                let mask = uint;
-                while (mask & 0x80000000) {
-                    cidr++;
-                    mask = (mask << 1) >>> 0;
-                }
-                // 验证合法性
-                const expectedMask = cidr === 0 ? 0 : ((0xFFFFFFFF << (32 - cidr)) >>> 0);
-                if (expectedMask !== uint) return -1;
-                return cidr;
-            }
-
-            function toBinaryOctets(octets) {
-                return octets.map(o => o.toString(2).padStart(8, '0'));
-            }
-
-            function getIpType(octets) {
-                const first = octets[0];
-                const second = octets[1];
-                const full = ipToUint32(octets);
-
-                // 特殊地址优先（broadcast/unspecified 必须在 >=240 检查之前）
-                if (full === 0xFFFFFFFF) return { type: 'broadcast', label: '受限广播地址 (255.255.255.255)', cls: 'broadcast' };
-                if (full === 0) return { type: 'unspecified', label: '未指定地址 (0.0.0.0)', cls: 'reserved' };
-                if (first === 0) return { type: 'reserved', label: '保留地址 (0.0.0.0/8)', cls: 'reserved' };
-                if (first === 127) return { type: 'loopback', label: '回环地址 (127.0.0.0/8)', cls: 'loopback' };
-                if (first === 10) return { type: 'private', label: '私有地址 A类 (10.0.0.0/8)', cls: 'private' };
-                if (first === 172 && second >= 16 && second <= 31) return { type: 'private', label: '私有地址 B类 (172.16.0.0/12)', cls: 'private' };
-                if (first === 192 && second === 168) return { type: 'private', label: '私有地址 C类 (192.168.0.0/16)', cls: 'private' };
-                if (first === 169 && second === 254) return { type: 'link-local', label: '链路本地 (169.254.0.0/16)', cls: 'link-local' };
-                if (first >= 224 && first <= 239) return { type: 'multicast', label: '多播地址 D类 (224.0.0.0/4)', cls: 'multicast' };
-                if (first >= 240) return { type: 'reserved', label: '保留地址 E类 (240.0.0.0/4)', cls: 'reserved' };
-                if (first >= 1 && first <= 126) return { type: 'public-a', label: '公网地址 A类', cls: 'public' };
-                if (first >= 128 && first <= 191) return { type: 'public-b', label: '公网地址 B类', cls: 'public' };
-                if (first >= 192) return { type: 'public-c', label: '公网地址 C类', cls: 'public' };
-                return { type: 'public', label: '公网地址', cls: 'public' };
-            }
-
-            // ============ 核心计算 ============
-            function calculate() {
-                // 清除错误状态
-                ipInput.classList.remove('error');
-                maskInput.classList.remove('error');
-
-                const ipOctets = ipToOctets(ipInput.value);
-                const maskOctets = maskToOctets(maskInput.value);
-
-                if (!ipOctets) {
-                    ipInput.classList.add('error');
-                    resultsGrid.innerHTML =
-                        '<div class="tile accent-red" style="grid-column:1/-1;text-align:center;"><div class="tile-value" style="color:#e81123;">❌ 请输入有效的IP地址</div></div>';
-                    binaryContent.innerHTML = '';
-                    ipTypeSection.innerHTML = '';
-                    return;
-                }
-                if (!maskOctets) {
-                    maskInput.classList.add('error');
-                    resultsGrid.innerHTML =
-                        '<div class="tile accent-red" style="grid-column:1/-1;text-align:center;"><div class="tile-value" style="color:#e81123;">❌ 请输入有效的子网掩码</div></div>';
-                    binaryContent.innerHTML = '';
-                    ipTypeSection.innerHTML = '';
-                    return;
-                }
-
-                const cidr = octetsToCidr(maskOctets);
-                if (cidr < 0) {
-                    maskInput.classList.add('error');
-                    resultsGrid.innerHTML =
-                        '<div class="tile accent-red" style="grid-column:1/-1;text-align:center;"><div class="tile-value" style="color:#e81123;">❌ 子网掩码不连续，请使用合法的掩码</div></div>';
-                    binaryContent.innerHTML = '';
-                    ipTypeSection.innerHTML = '';
-                    return;
-                }
-
-                const ipUint = ipToUint32(ipOctets);
-                const maskUint = ipToUint32(maskOctets);
-                const networkUint = (ipUint & maskUint) >>> 0;
-                const broadcastUint = (networkUint | (~maskUint >>> 0)) >>> 0;
-                const wildcardUint = (~maskUint) >>> 0;
-                const totalHosts = cidr === 32 ? 1 : (cidr === 31 ? 2 : Math.pow(2, 32 - cidr));
-                const usableHosts = cidr >= 31 ? (cidr === 32 ? 0 : 2) : totalHosts - 2;
-                const firstHostUint = cidr >= 31 ? networkUint : (networkUint + 1) >>> 0;
-                const lastHostUint = cidr >= 31 ? broadcastUint : (broadcastUint - 1) >>> 0;
-
-                const networkOctets = [
-                    (networkUint >>> 24) & 0xFF,
-                    (networkUint >>> 16) & 0xFF,
-                    (networkUint >>> 8) & 0xFF,
-                    networkUint & 0xFF,
-                ];
-                const broadcastOctets = [
-                    (broadcastUint >>> 24) & 0xFF,
-                    (broadcastUint >>> 16) & 0xFF,
-                    (broadcastUint >>> 8) & 0xFF,
-                    broadcastUint & 0xFF,
-                ];
-                const firstHostOctets = [
-                    (firstHostUint >>> 24) & 0xFF,
-                    (firstHostUint >>> 16) & 0xFF,
-                    (firstHostUint >>> 8) & 0xFF,
-                    firstHostUint & 0xFF,
-                ];
-                const lastHostOctets = [
-                    (lastHostUint >>> 24) & 0xFF,
-                    (lastHostUint >>> 16) & 0xFF,
-                    (lastHostUint >>> 8) & 0xFF,
-                    lastHostUint & 0xFF,
-                ];
-                const wildcardOctets = [
-                    (wildcardUint >>> 24) & 0xFF,
-                    (wildcardUint >>> 16) & 0xFF,
-                    (wildcardUint >>> 8) & 0xFF,
-                    wildcardUint & 0xFF,
-                ];
-
-                // 同步下拉菜单选中项
-                maskInput.value = String(cidr);
-
-                // IP类型
-                const ipType = getIpType(ipOctets);
-                ipTypeSection.innerHTML = `
-                    <span style="font-weight:600;font-size:12px;letter-spacing:0.5px;color:#555;">IP类型：</span>
-                    <span class="ip-type-badge ${ipType.cls}">${ipType.label}</span>
-                `;
-
-                // 渲染磁贴
-                const tiles = [
-                    { label: '网络地址', value: networkOctets.join('.'), accent: 'accent-blue', copy: true },
-                    { label: '广播地址', value: broadcastOctets.join('.'), accent: 'accent-red', copy: true },
-                    { label: '可用IP范围', value: firstHostOctets.join('.') + ' ~ ' + lastHostOctets.join('.'),
-                        accent: 'accent-green', small: true, copy: true },
-                    { label: '子网掩码', value: maskOctets.join('.') + '  /' + cidr, accent: 'accent-purple',
-                    copy: true },
-                    { label: '通配符掩码', value: wildcardOctets.join('.'), accent: 'accent-teal', copy: true },
-                    { label: '总主机数', value: totalHosts.toLocaleString(), accent: 'accent-orange', copy: false },
-                    { label: '可用主机数', value: usableHosts.toLocaleString(), accent: 'accent-cyan', copy: false },
-                    { label: 'CIDR前缀', value: '/' + cidr, accent: 'accent-blue', copy: false },
-                    { label: 'IP类型', value: ipType.label, accent: 'accent-' + (ipType.cls === 'public' ? 'green' :
-                            ipType.cls === 'private' ? 'orange' : 'red'), small: true, copy: false },
-                ];
-
-                resultsGrid.innerHTML = tiles.map((t) => `
-                    <div class="tile ${t.accent}${t.copy ? ' copyable' : ''}" data-copy="${t.copy ? t.value : ''}">
-                        <span class="tile-label">${t.label}</span>
-                        <span class="tile-value${t.small ? ' small' : ''}">${t.value}</span>
-                        ${t.copy ? '<button class="copy-btn" type="button" aria-label="复制">📋</button>' : ''}
-                    </div>
-                `).join('');
-
-                // 二进制详情
-                const ipBin = toBinaryOctets(ipOctets);
-                const maskBin = toBinaryOctets(maskOctets);
-                const netBin = toBinaryOctets(networkOctets);
-                const bcBin = toBinaryOctets(broadcastOctets);
-
-                // 高亮网络部分（被掩码覆盖的位）
-                const highlightCount = cidr;
-                function renderBinRow(label, binOctets) {
-                    const spans = binOctets.map((octet, idx) => {
-                        // 仅当整个 octet 全为网络位时才加 .highlight（蓝底）；部分网络位的 octet 靠 per-bit 颜色区分
-                        const isFullOctet = (idx + 1) * 8 <= highlightCount;
-                        let html = '';
-                        for (let b = 0; b < 8; b++) {
-                            const bitPos = idx * 8 + b;
-                            const isHighlight = bitPos < highlightCount;
-                            html +=
-                                `<span style="color:${isHighlight ? '#0078d4' : '#999'};font-weight:${isHighlight ? '700' : '400'};">${octet[b]}</span>`;
-                            if (b === 3) html += ' ';
-                        }
-                        return `<span class="bin-octet${isFullOctet ? ' highlight' : ''}">${html}</span>`;
-                    }).join('<span style="color:#ccc;margin:0 2px;">·</span>');
-                    return `
-                        <div class="binary-row">
-                            <span class="bin-label">${label}</span>
-                            <div class="bin-octets">${spans}</div>
-                        </div>`;
-                }
-
-                binaryContent.innerHTML = `
-                    ${renderBinRow('IP地址', ipBin)}
-                    ${renderBinRow('子网掩码', maskBin)}
-                    ${renderBinRow('网络地址', netBin)}
-                    ${renderBinRow('广播地址', bcBin)}
-                    <div style="font-size:10px;color:#999;margin-top:6px;display:flex;align-items:center;gap:4px;flex-wrap:wrap;"><span style="display:inline-block;width:10px;height:10px;background:#0078d4;"></span><span>蓝色 = 网络位</span><span style="color:#bbb;">|</span><span style="display:inline-block;width:10px;height:10px;background:#ddd;"></span><span>灰色 = 主机位</span></div>
-                `;
-            }
-
-            // ============ 复制工具 ============
-            async function copyToClipboard(text) {
-                if (navigator.clipboard && window.isSecureContext) {
-                    try { await navigator.clipboard.writeText(text); return true; }
-                    catch { /* fallback below */ }
-                }
-                // 老旧浏览器 fallback
-                const ta = document.createElement('textarea');
-                ta.value = text;
-                ta.style.position = 'fixed';
-                ta.style.left = '-9999px';
-                document.body.appendChild(ta);
-                ta.select();
-                let ok = false;
-                try { ok = document.execCommand('copy'); } catch { ok = false; }
-                document.body.removeChild(ta);
-                return ok;
-            }
-
-            // ============ 事件监听 ============
-            btnCalc.addEventListener('click', calculate);
-
-            ipInput.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    calculate();
-                }
-            });
-
-            // 实时计算：IP 输入框输入时去抖；下拉框 change 立即计算
-            let debounceTimer;
-            ipInput.addEventListener('input', () => {
-                clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(calculate, 400);
-            });
-            maskInput.addEventListener('change', () => {
-                calculate();
-            });
-
-            // 磁贴复制：使用事件委托，绑定一次复用（避免每次 calculate() 重新挂监听）
-            resultsGrid.addEventListener('click', async (e) => {
-                const tile = e.target.closest('.tile[data-copy]');
-                if (!tile || !tile.dataset.copy) return;
-                const ok = await copyToClipboard(tile.dataset.copy);
-                showToast(ok ? '✅ 已复制：' + tile.dataset.copy : '❌ 复制失败');
-            });
-
-            // 页面加载时自动计算
-            calculate();
-
-            // 键盘快捷键：Ctrl+Enter 全局重算
-            document.addEventListener('keydown', (e) => {
-                if (e.ctrlKey && e.key === 'Enter') {
-                    e.preventDefault();
-                    calculate();
-                }
-            });
-        })();
-    </script>
+    <!-- subnet.js 必须先于 app.js 加载（app.js 依赖 window.SubnetCalc） -->
+    <script src="subnet.js"></script>
+    <script src="app.js" defer></script>
 </body>
 </html>
